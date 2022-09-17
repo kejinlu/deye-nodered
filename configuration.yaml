@@ -1,0 +1,104 @@
+mqtt:
+  broker: 192.168.1.5
+
+  humidifier:
+    - name: "Deye Dehumidifier 1"
+      device_class: "dehumidifier"
+      state_topic: "stat/dehumidifier/deye1/state"
+      state_value_template: >
+        {% if value_json.power_status is defined %}
+          {{value_json.power_status}}
+        {% endif %}
+      command_topic: "cmnd/dehumidifier/deye1/power"
+      target_humidity_command_topic: "cmnd/dehumidifier/deye1/humidity"
+      target_humidity_state_topic: "stat/dehumidifier/deye1/state"
+      target_humidity_state_template: >
+        {%- if value_json.target_humidity is defined %}
+          {{ value_json.target_humidity | int }}
+        {%- endif -%}
+      mode_state_topic: "stat/dehumidifier/deye1/state"
+      mode_state_template: |
+        {%- set modes = {"manual": "手动", "laundry": "干衣"} %}
+        {%- if "device_mode" in value_json %}
+          {{ modes[value_json.device_mode] }}
+        {%- endif %}
+      mode_command_topic: "cmnd/dehumidifier/deye1/mode"
+      mode_command_template: |
+        {%- set mode_enum = {"手动": "manual", "干衣": "laundry"} %}
+        {%- set enum = mode_enum[value] %}
+        {{ enum }}
+      unique_id: "dehumidifier.deye1"
+      modes:
+        - "手动"
+        - "干衣"
+      qos: 0
+      payload_on: "ON"
+      payload_off: "OFF"
+
+  binary_sensor:
+    - name: "Deye1 Water Full"
+      unique_id: "binary_sensor.deye1_waterfull"
+      state_topic: "stat/dehumidifier/deye1/state"
+      payload_on: "ON"
+      payload_off: "OFF"
+      qos: 0
+      value_template: >
+        {% if value_json.water_full is defined %}
+          {{value_json.water_full}}
+        {% endif %}
+
+    - name: "Deye1 Fan Status"
+      unique_id: "binary_sensor.deye1_fan_status"
+      state_topic: "stat/dehumidifier/deye1/state"
+      payload_on: "ON"
+      payload_off: "OFF"
+      qos: 0
+      value_template: >
+        {% if value_json.fan_status is defined %}
+          {{value_json.fan_status}}
+        {% endif %}
+
+    - name: "Deye1 Device Status"
+      unique_id: "binary_sensor.deye1_device_status"
+      state_topic: "stat/dehumidifier/deye1/state"
+      payload_on: "ON"
+      payload_off: "OFF"
+      qos: 0
+      value_template: >
+        {% if value_json.device_status is defined %}
+          {{value_json.device_status}}
+        {% endif %}
+
+  sensor:
+    - name: "Deye1 Temperature"
+      unique_id: "sensor.deye1_temperature"
+      state_topic: "stat/dehumidifier/deye1/state"
+      qos: 0
+      unit_of_measurement: "°C"
+      value_template: >
+        {%- if value_json.current_temperature is defined %}
+          {{ value_json.current_temperature }}
+        {%- endif -%}
+      device_class: temperature
+
+    - name: "Deye1 Humidity"
+      unique_id: "sensor.deye1_humidity"
+      state_topic: "stat/dehumidifier/deye1/state"
+      qos: 0
+      unit_of_measurement: "%"
+      value_template: >
+        {%- if value_json.current_humidity is defined %}
+          {{ value_json.current_humidity }}
+        {%- endif -%}
+      device_class: humidity
+
+    - name: "Deye1 Fan Level"
+      unique_id: "sensor.deye1_fan_level"
+      state_topic: "stat/dehumidifier/deye1/state"
+      qos: 0
+      value_template: >
+        {%- if value_json.fan_level is defined %}
+          {%- set level_enum = ["停止", "低风", "中风", "高风"] %}
+          {%- set level = level_enum[value_json.fan_level] %}
+          {{ level }}
+        {%- endif -%}
