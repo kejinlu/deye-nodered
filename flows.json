@@ -1,0 +1,344 @@
+[
+    {
+        "id": "9a231541.649cf8",
+        "type": "tab",
+        "label": "德业除湿机器",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "faa01185.4163e",
+        "type": "mqtt in",
+        "z": "9a231541.649cf8",
+        "name": "德业除湿机状态接受",
+        "topic": "/status/hex",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "6792a04d.5d64c",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "x": 170,
+        "y": 160,
+        "wires": [
+            [
+                "db2042d3.304",
+                "97bcee90.9958e"
+            ]
+        ]
+    },
+    {
+        "id": "f2078c90.cb02e",
+        "type": "debug",
+        "z": "9a231541.649cf8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 590,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "eaaae109.2aef2",
+        "type": "mqtt out",
+        "z": "9a231541.649cf8",
+        "name": "德业除湿机命令发送",
+        "topic": "/command/hex",
+        "qos": "0",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "6792a04d.5d64c",
+        "x": 600,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "432bd4f4.1fd1ac",
+        "type": "function",
+        "z": "9a231541.649cf8",
+        "name": "设置命令",
+        "func": "// var buf = Buffer.from(\"080201001e0000000000\",\"hex\");\n// msg.payload = buf;\n\nvar power_status_hex_str = flow.get(\"power_status_hex_str\");\nvar fan_level_hex_str = flow.get(\"fan_level_hex_str\");\nvar device_mode_hex_str = flow.get(\"device_mode_hex_str\");\nvar target_humidity_hex_str = flow.get(\"target_humidity_hex_str\");\n\nif (msg.topic === \"cmnd/dehumidifier/deye1/power\") {\n    // 开关机\n    if (msg.payload === \"ON\") {\n        // 设置开机\n        if (power_status_hex_str === \"0\"){\n            // 如果是普通关机状态，则变为普通开机状态\n            power_status_hex_str = \"1\";\n        } else if (power_status_hex_str === \"6\"){\n            // 如果是童锁关机状态，则变为童锁开机状态\n            power_status_hex_str = \"7\";\n        } else {\n            return null;\n        }\n    } else {\n        // 设置关机\n        if (power_status_hex_str === \"1\" || power_status_hex_str === \"B\" ){\n            // 如果是普通开机或者有定时关机的开机状态，则变为普通关机状态\n            power_status_hex_str = \"0\";\n        } else if (power_status_hex_str === \"6\"){\n            // 如果是童锁开机状态，则变为童锁关机状态\n            power_status_hex_str = \"7\";\n        } else {\n            return null;\n        }\n    }\n} else if (msg.topic === \"cmnd/dehumidifier/deye1/humidity\") {\n    var h_dec = parseInt(msg.payload);\n    target_humidity_hex_str = h_dec.toString(16);\n    if(target_humidity_hex_str.length === 1) {\n        target_humidity_hex_str = \"0\"+target_humidity_hex_str;\n    }\n} else if (msg.topic === \"cmnd/dehumidifier/deye1/mode\") {\n    if(msg.payload === \"manual\") {\n        device_mode_hex_str = \"0\";\n    } else if (msg.payload === \"laundry\") {\n        device_mode_hex_str = \"1\";\n    }\n}\n\nvar newmsg = {};\nnewmsg.payload = Buffer.from(\"08020\"+power_status_hex_str+fan_level_hex_str+device_mode_hex_str+target_humidity_hex_str+\"0000000000\",\"hex\");\nreturn newmsg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 480,
+        "wires": [
+            [
+                "b0237a33.481968",
+                "eaaae109.2aef2"
+            ]
+        ]
+    },
+    {
+        "id": "db2042d3.304",
+        "type": "function",
+        "z": "9a231541.649cf8",
+        "name": "解析状态",
+        "func": "var data = msg.payload.data;\n\n// 这个几个状态需要额外共享给命令设置\nvar power_status_hex_str = data.substr(5,1);\nvar fan_level_hex_str = data.substr(8,1);\nvar device_mode_hex_str = data.substr(9,1);\nvar target_humidity_hex_str = data.substr(10,2);\n\nflow.set(\"power_status_hex_str\", power_status_hex_str);\nif (fan_level_hex_str !== \"0\") {\n    flow.set(\"fan_level_hex_str\", fan_level_hex_str);\n}\nflow.set(\"device_mode_hex_str\", device_mode_hex_str);\nflow.set(\"target_humidity_hex_str\", target_humidity_hex_str);\n\nvar fan_status_dec = parseInt(data.substr(4,1),16);\nvar power_status_dec = parseInt(power_status_hex_str,16);\nvar device_status_dec = parseInt(data.substr(7,1),16);\nvar fan_level_dec =  parseInt(fan_level_hex_str,16);\nvar device_mode_dec = parseInt(device_mode_hex_str,16);\nvar target_humidity_dec = parseInt(target_humidity_hex_str,16);\nvar current_humidity_dec =parseInt(data.substr(32,2),16);\nvar current_temperature_dec = parseInt(data.substr(30,2),16)-40;\n\n// power status\nvar power_status = \"ON\";\nif(power_status_dec===1 || power_status_dec===11 || power_status_dec===7){\n    power_status = \"ON\";\n} else {\n    power_status = \"OFF\";\n}\n\n// water tank\nvar water_full = \"OFF\";\nif(fan_status_dec === 4) {\n    water_full = \"ON\";\n}\n\n// fan status\nvar fan_status = \"OFF\";\nif(fan_status_dec === 8) {\n    fan_status = \"ON\";\n}\n\n// device status 压缩机状态\nvar device_status = \"OFF\";\nif(device_status_dec === 8) {\n    device_status = \"ON\";\n}\n\n// device mode\nvar device_mode = \"manual\";\nif(device_mode_dec === 0) {\n    device_mode = \"manual\";\n} else if(device_mode_dec === 1) {\n    device_mode = \"laundry\";\n}\n\nvar payload = {\n    \"power_status\":power_status,\n    \"water_full\":water_full,\n    \"fan_status\":fan_status,\n    \"device_status\":device_status,\n    \"fan_level\":fan_level_dec,\n    \"device_mode\":device_mode,\n    \"target_humidity\":target_humidity_dec,\n    \"current_humidity\":current_humidity_dec,\n    \"current_temperature\":current_temperature_dec\n};\nvar newmsg = {};\nnewmsg.payload=payload;\nreturn newmsg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 160,
+        "wires": [
+            [
+                "f2078c90.cb02e",
+                "94718caf.c7d93"
+            ]
+        ]
+    },
+    {
+        "id": "94718caf.c7d93",
+        "type": "mqtt out",
+        "z": "9a231541.649cf8",
+        "name": "状态转发",
+        "topic": "stat/dehumidifier/deye1/state",
+        "qos": "1",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "e41cf4ef.9d8f88",
+        "x": 600,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "f3f23877.370f68",
+        "type": "mqtt in",
+        "z": "9a231541.649cf8",
+        "name": "开关设置",
+        "topic": "cmnd/dehumidifier/deye1/power",
+        "qos": "2",
+        "datatype": "auto",
+        "broker": "e41cf4ef.9d8f88",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "x": 140,
+        "y": 480,
+        "wires": [
+            [
+                "3babc107.278a8e",
+                "432bd4f4.1fd1ac"
+            ]
+        ]
+    },
+    {
+        "id": "3babc107.278a8e",
+        "type": "debug",
+        "z": "9a231541.649cf8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 370,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "6eadadc0.c49fa4",
+        "type": "mqtt in",
+        "z": "9a231541.649cf8",
+        "name": "湿度设置",
+        "topic": "cmnd/dehumidifier/deye1/humidity",
+        "qos": "2",
+        "datatype": "auto",
+        "broker": "e41cf4ef.9d8f88",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "x": 140,
+        "y": 560,
+        "wires": [
+            [
+                "432bd4f4.1fd1ac",
+                "3babc107.278a8e"
+            ]
+        ]
+    },
+    {
+        "id": "f072ae40.cd11e",
+        "type": "mqtt in",
+        "z": "9a231541.649cf8",
+        "name": "模式设置",
+        "topic": "cmnd/dehumidifier/deye1/mode",
+        "qos": "2",
+        "datatype": "auto",
+        "broker": "e41cf4ef.9d8f88",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "x": 140,
+        "y": 640,
+        "wires": [
+            [
+                "432bd4f4.1fd1ac",
+                "3babc107.278a8e"
+            ]
+        ]
+    },
+    {
+        "id": "97bcee90.9958e",
+        "type": "debug",
+        "z": "9a231541.649cf8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 410,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "13c0e4e8.5030cb",
+        "type": "inject",
+        "z": "9a231541.649cf8",
+        "name": "自动刷新",
+        "props": [],
+        "repeat": "15",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 400,
+        "wires": [
+            [
+                "ae5a796a.40db18"
+            ]
+        ]
+    },
+    {
+        "id": "ae5a796a.40db18",
+        "type": "function",
+        "z": "9a231541.649cf8",
+        "name": "刷新命令",
+        "func": "msg.payload = Buffer.from(\"0001\",\"hex\");\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 400,
+        "wires": [
+            [
+                "eaaae109.2aef2",
+                "b052e44f.1ee688"
+            ]
+        ]
+    },
+    {
+        "id": "b052e44f.1ee688",
+        "type": "debug",
+        "z": "9a231541.649cf8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "b0237a33.481968",
+        "type": "debug",
+        "z": "9a231541.649cf8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "6792a04d.5d64c",
+        "type": "mqtt-broker",
+        "name": "deye",
+        "broker": ".mqtt.iot.gz.baidubce.com",
+        "port": "1883",
+        "tls": "",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": false,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": ""
+    },
+    {
+        "id": "e41cf4ef.9d8f88",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "192.168.1.x",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "compatmode": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": ""
+    }
+]
