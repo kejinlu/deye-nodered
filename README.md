@@ -1,4 +1,4 @@
-# 德业除湿机 + Node-RED
+# 德业除湿机 + Node-RED + Homeassistant
 
 通过Node-RED我们可以将德业除湿机接入诸如Homeassistant这样的服务，方便管理。
 
