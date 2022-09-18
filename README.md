@@ -5,6 +5,8 @@
 ### 1.获取德业除湿机配置信息
 首先通过 https://github.com/kejinlu/deyeinfo 的脚本我们可以很轻松的获得我们所需要的德业除湿机mqtt服务的相关信息。
 
+MQTT协议分析可以参见 https://www.yuque.com/lukejin/homelab/im1qyg
+
 
 ### 2.Node-RED中导入流程
 然后我们将[flows.json](https://github.com/kejinlu/deye-nodered/blob/main/flows.json)导入Node-RED，可以看到类似下面的Flows：
